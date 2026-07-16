@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Gate Verify — Admin</title>
+<style>
+  :root {
+    --ink: #10140f; --panel: #171d15; --panel-2: #1f271b; --line: #33402c;
+    --olive: #4a5c34; --olive-bright: #7a9c4e; --gold: #d4af37;
+    --text: #eef0e9; --text-dim: #9aa693; --deny: #e2543f; --allow: #4caf6b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--ink); color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif; padding: 24px 16px 48px;
+  }
+  .wrap { max-width: 620px; margin: 0 auto; }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  .sub { color: var(--text-dim); font-size: 12px; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 0.1em; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; margin-bottom: 16px; }
+  h2 { font-size: 14px; margin: 0 0 12px; color: var(--olive-bright); text-transform: uppercase; letter-spacing: 0.08em; }
+  input[type="text"], select {
+    padding: 10px; border-radius: 7px; border: 1px solid var(--line);
+    background: var(--panel-2); color: var(--text); font-size: 14px;
+  }
+  .row { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  .row input[type="text"] { flex: 1; min-width: 120px; }
+  button {
+    font: inherit; cursor: pointer; border: none; border-radius: 7px;
+    padding: 10px 14px; font-weight: 600; background: var(--olive-bright); color: #0e130b;
+  }
+  button.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); }
+  th { color: var(--text-dim); text-transform: uppercase; font-size: 11px; letter-spacing: 0.06em; }
+  .badge { padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+  .badge.frozen { background: #3a3317; color: #d4af37; }
+  .badge.dropped { background: #3a1c17; color: var(--deny); }
+  .del { background: transparent; color: var(--deny); border: none; cursor: pointer; font-size: 12px; padding: 4px 8px; }
+  .note { color: var(--text-dim); font-size: 12px; margin-top: 8px; }
+  .file-label {
+    display: inline-block; padding: 10px 14px; border-radius: 7px;
+    background: var(--panel-2); border: 1px dashed var(--line); cursor: pointer; font-size: 13px;
+  }
+  input[type=file] { display: none; }
+  #importResult { font-size: 13px; margin-top: 10px; color: var(--text-dim); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Gate Verify — Admin</h1>
+  <div class="sub">Manage frozen / dropped-out roll numbers</div>
+
+  <div class="panel">
+    <h2>Bulk Import (CSV)</h2>
+    <p class="note">Columns: <code>roll_number, status, note</code> — status must be <code>frozen</code> or <code>dropped</code>. Re-importing updates existing entries.</p>
+    <label class="file-label">
+      Choose CSV file
+      <input type="file" id="csvFile" accept=".csv" />
+    </label>
+    <div id="importResult"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Add / Update One</h2>
+    <div class="row">
+      <input type="text" id="addRoll" placeholder="Roll number" />
+      <select id="addStatus">
+        <option value="frozen">frozen</option>
+        <option value="dropped">dropped</option>
+      </select>
+    </div>
+    <div class="row">
+      <input type="text" id="addNote" placeholder="Note (optional)" />
+      <button id="addBtn">Add</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Current List</h2>
+    <table id="listTable">
+      <thead><tr><th>Roll Number</th><th>Status</th><th>Note</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+async function loadList() {
+  const res = await fetch('/admin/list');
+  const rows = await res.json();
+  const tbody = document.querySelector('#listTable tbody');
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td>${escapeHtml(r.roll_number)}</td>
+      <td><span class="badge ${r.status}">${r.status}</span></td>
+      <td>${escapeHtml(r.note || '')}</td>
+      <td><button class="del" data-roll="${escapeHtml(r.roll_number)}">Remove</button></td>
+    </tr>
+  `).join('') || '<tr><td colspan="4" class="note">No entries yet.</td></tr>';
+
+  document.querySelectorAll('.del').forEach(btn => {
+    btn.onclick = async () => {
+      await fetch(`/admin/list/${encodeURIComponent(btn.dataset.roll)}`, { method: 'DELETE' });
+      loadList();
+    };
+  });
+}
+
+document.getElementById('addBtn').onclick = async () => {
+  const roll = document.getElementById('addRoll').value.trim();
+  const status = document.getElementById('addStatus').value;
+  const note = document.getElementById('addNote').value.trim();
+  if (!roll) return;
+  const formData = new FormData();
+  formData.append('roll_number', roll);
+  formData.append('status', status);
+  formData.append('note', note);
+  await fetch('/admin/list', { method: 'POST', body: formData });
+  document.getElementById('addRoll').value = '';
+  document.getElementById('addNote').value = '';
+  loadList();
+};
+
+document.getElementById('csvFile').onchange = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await fetch('/admin/list/import', { method: 'POST', body: formData });
+  const data = await res.json();
+  const el = document.getElementById('importResult');
+  if (!res.ok) {
+    el.textContent = data.detail || 'Import failed.';
+  } else {
+    el.textContent = `Imported ${data.imported} entries.` + (data.errors.length ? ` ${data.errors.length} row(s) skipped: ${data.errors.join('; ')}` : '');
+  }
+  loadList();
+};
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+loadList();
+</script>
+</body>
+</html>
