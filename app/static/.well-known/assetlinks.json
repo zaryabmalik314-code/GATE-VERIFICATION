@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "app.netlify.iridescent_taiyaki_e8a3b7.twa",
+        "sha256_cert_fingerprints": ["2C:2A:8B:3C:3E:45:29:FF:8D:DA:29:0C:4B:23:9E:F2:08:5F:6A:1F:07:31:C4:D1:4F:E0:19:29:3A:E7:5E:2A"]
+      }
+    }]
