@@ -16,7 +16,7 @@ import cv2
 import numpy as np
 import pytesseract
 from PIL import Image
-
+pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 class CardReadError(Exception):
     """Raised when the roll number or session can't be confidently extracted."""
